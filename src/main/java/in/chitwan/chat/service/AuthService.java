@@ -10,7 +10,7 @@ public class AuthService {
     @Autowired
     private UserTokenRepository tokenRepository;
 
-    public boolean isTokenValid(String token) {
-        return tokenRepository.findByToken(token).isPresent();
-    }
+//    public boolean isTokenValid(String token) {
+//        return tokenRepository.findByToken(token).isPresent();
+//    }
 }

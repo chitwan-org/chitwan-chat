@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chat Service</title>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sockjs-client@1.5.2/dist/sockjs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/stompjs@2.3.3/lib/stomp.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Roboto', sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #1a2a6c, #b21f1f, #1a2a6c);
+            color: #333;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        header {
+            text-align: center;
+            padding: 20px;
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+        
+        h1 {
+            color: #1a2a6c;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        
+        .subtitle {
+            color: #555;
+            font-size: 1.2rem;
+            margin-bottom: 20px;
+        }
+        
+        .status {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 20px;
+            font-weight: 500;
+            margin-top: 15px;
+        }
+        
+        .status.connected {
+            background-color: #4CAF50;
+            color: white;
+        }
+        
+        .status.disconnected {
+            background-color: #F44336;
+            color: white;
+        }
+        
+        .main-content {
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+        }
+        
+        .panel {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 25px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+            flex: 1;
+            min-width: 300px;
+        }
+        
+        .panel-title {
+            font-size: 1.5rem;
+            color: #1a2a6c;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1a2a6c;
+        }
+        
+        .form-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 500;
+            color: #333;
+        }
+        
+        input, textarea, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: border 0.3s;
+        }
+        
+        input:focus, textarea:focus, select:focus {
+            outline: none;
+            border-color: #1a2a6c;
+            box-shadow: 0 0 0 3px rgba(26, 42, 108, 0.1);
+        }
+        
+        button {
+            background: #1a2a6c;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 8px;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            font-weight: 500;
+        }
+        
+        button:hover {
+            background: #0e1a4e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+        
+        button:disabled {
+            background: #cccccc;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: none;
+        }
+        
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 400px;
+            background: white;
+            border-radius: 10px;
+            overflow: hidden;
+            border: 1px solid #ddd;
+        }
+        
+        .chat-messages {
+            flex: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background: #f9f9f9;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 10px 15px;
+            border-radius: 15px;
+            max-width: 80%;
+            position: relative;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        .sent {
+            background: #1a2a6c;
+            color: white;
+            align-self: flex-end;
+            margin-left: 20%;
+            border-bottom-right-radius: 5px;
+        }
+        
+        .received {
+            background: #e9ecef;
+            color: #333;
+            align-self: flex-start;
+            margin-right: 20%;
+            border-bottom-left-radius: 5px;
+        }
+        
+        .message-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.85rem;
+            margin-bottom: 5px;
+        }
+        
+        .sender {
+            font-weight: bold;
+        }
+        
+        .time {
+            opacity: 0.7;
+        }
+        
+        .chat-input {
+            display: flex;
+            padding: 10px;
+            background: #fff;
+            border-top: 1px solid #ddd;
+        }
+        
+        .chat-input input {
+            flex: 1;
+            margin-right: 10px;
+        }
+        
+        .user-list {
+            list-style: none;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .user-list li {
+            padding: 12px 15px;
+            border-bottom: 1px solid #eee;
+            display: flex;
+            align-items: center;
+            transition: background 0.2s;
+        }
+        
+        .user-list li:hover {
+            background: #f0f4ff;
+        }
+        
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: #1a2a6c;
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            margin-right: 15px;
+        }
+        
+        .user-info {
+            flex: 1;
+        }
+        
+        .user-name {
+            font-weight: 500;
+            margin-bottom: 3px;
+        }
+        
+        .user-id {
+            font-size: 0.85rem;
+            color: #666;
+        }
+        
+        .online-status {
+            width: 10px;
+            height: 10px;
+            border-radius: 50%;
+            background: #ccc;
+            margin-left: 10px;
+        }
+        
+        .online-status.online {
+            background: #4CAF50;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            color: white;
+            font-size: 0.9rem;
+            margin-top: 20px;
+        }
+        
+        @media (max-width: 768px) {
+            .main-content {
+                flex-direction: column;
+            }
+            
+            .panel {
+                min-width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Chat Service</h1>
+            <p class="subtitle">Connect with others using your unique token ID</p>
+            <div class="status disconnected" id="connectionStatus">Disconnected</div>
+        </header>
+        
+        <div class="main-content">
+            <div class="panel">
+                <h2 class="panel-title">Connection Setup</h2>
+                <div class="form-group">
+                    <label for="tokenInput">Your Token ID:</label>
+                    <input type="text" id="tokenInput" placeholder="Enter your unique token ID">
+                </div>
+                <div class="form-group">
+                    <label for="userIdInput">Your User ID:</label>
+                    <input type="text" id="userIdInput" placeholder="Enter your user ID">
+                </div>
+                <button id="connectBtn">Connect to Chat</button>
+                <button id="disconnectBtn" disabled>Disconnect</button>
+                
+                <div class="form-group" style="margin-top: 30px;">
+                    <h2 class="panel-title">Send Message</h2>
+                    <label for="receiverId">Recipient User ID:</label>
+                    <input type="text" id="receiverId" placeholder="Enter recipient's user ID">
+                    
+                    <label for="messageInput">Your Message:</label>
+                    <textarea id="messageInput" rows="3" placeholder="Type your message here..."></textarea>
+                    
+                    <button id="sendBtn" disabled>Send Message</button>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2 class="panel-title">Chat Messages</h2>
+                <div class="chat-container">
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message received">
+                            <div class="message-header">
+                                <span class="sender">System</span>
+                                <span class="time">Just now</span>
+                            </div>
+                            <div class="message-content">Welcome to the chat service! Connect with your token to start chatting.</div>
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <input type="text" id="quickMessage" placeholder="Type a message...">
+                        <button id="quickSendBtn" disabled>Send</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="panel">
+                <h2 class="panel-title">Online Users</h2>
+                <ul class="user-list" id="userList">
+                    <li>
+                        <div class="user-avatar">JD</div>
+                        <div class="user-info">
+                            <div class="user-name">John Doe</div>
+                            <div class="user-id">ID: 12345</div>
+                        </div>
+                        <div class="online-status online"></div>
+                    </li>
+                    <li>
+                        <div class="user-avatar">AS</div>
+                        <div class="user-info">
+                            <div class="user-name">Alice Smith</div>
+                            <div class="user-id">ID: 23456</div>
+                        </div>
+                        <div class="online-status online"></div>
+                    </li>
+                    <li>
+                        <div class="user-avatar">BJ</div>
+                        <div class="user-info">
+                            <div class="user-name">Bob Johnson</div>
+                            <div class="user-id">ID: 34567</div>
+                        </div>
+                        <div class="online-status"></div>
+                    </li>
+                    <li>
+                        <div class="user-avatar">EC</div>
+                        <div class="user-info">
+                            <div class="user-name">Emma Clark</div>
+                            <div class="user-id">ID: 45678</div>
+                        </div>
+                        <div class="online-status online"></div>
+                    </li>
+                </ul>
+            </div>
+        </div>
+        
+        <footer>
+            <p>Chat Service &copy; 2023 | Secure and Real-time Messaging</p>
+        </footer>
+    </div>
+
+    <script>
+        // Global variables
+        let stompClient = null;
+        let userId = null;
+        let token = null;
+
+        // DOM Elements
+        const connectBtn = document.getElementById('connectBtn');
+        const disconnectBtn = document.getElementById('disconnectBtn');
+        const sendBtn = document.getElementById('sendBtn');
+        const quickSendBtn = document.getElementById('quickSendBtn');
+        const connectionStatus = document.getElementById('connectionStatus');
+        const tokenInput = document.getElementById('tokenInput');
+        const userIdInput = document.getElementById('userIdInput');
+        const receiverId = document.getElementById('receiverId'); // Using receiverId as it's the ID in your HTML
+        const messageInput = document.getElementById('messageInput');
+        const quickMessage = document.getElementById('quickMessage'); // Using quickMessage as it's the ID in your HTML
+        const chatMessages = document.getElementById('chatMessages');
+        const userList = document.getElementById('userList');
+
+        // Connect to WebSocket
+        function connect() {
+            token = tokenInput.value.trim();
+            userId = userIdInput.value.trim();
+
+            if (!token) { // Changed alert message slightly for token only
+                alert('Please enter your Token ID.');
+                return;
+            }
+            if (!userId) { // Changed alert message slightly for user ID only
+                alert('Please enter your User ID.');
+                return;
+            }
+
+            // --- CRUCIAL CHANGE HERE: Specify the full backend WebSocket URL ---
+            // This ensures SockJS connects to your Spring Boot backend, not the frontend server.
+            const backendWsUrl = `http://localhost:8080/ws`;
+            const socket = new SockJS(`${backendWsUrl}?token=${token}`); // Pass token as query param
+
+            stompClient = Stomp.over(socket);
+
+            // Headers for STOMP connect. If your backend uses the token from the
+            // SockJS URL query param for connection auth, this header might be redundant
+            // but it doesn't hurt to send it if your backend might check both.
+            const headers = {
+                'Authorization': `Bearer ${token}`
+            };
+
+            stompClient.connect(headers, function(frame) {
+                connectionStatus.textContent = 'Connected';
+                connectionStatus.className = 'status connected';
+
+                // Enable/disable buttons
+                connectBtn.disabled = true;
+                disconnectBtn.disabled = false;
+                sendBtn.disabled = false;
+                quickSendBtn.disabled = false;
+
+                // Subscribe to user-specific topic
+                // This still uses the userId from the input, which is common for client-side knowledge
+                const subscriptionTopic = `/topic/user:${userId}`;
+                stompClient.subscribe(subscriptionTopic, function(message) {
+                    showMessage(JSON.parse(message.body), false);
+                });
+
+                // Show success message
+                showMessage({
+                    senderId: 'System',
+                    content: `Connected successfully as User ID: ${userId}! Listening on channel: ${subscriptionTopic}`
+                }, false);
+            }, function(error) {
+                console.error('Connection error:', error);
+                connectionStatus.textContent = 'Connection Failed';
+                connectionStatus.className = 'status disconnected';
+
+                // Ensure buttons are reset on connection failure
+                connectBtn.disabled = false;
+                disconnectBtn.disabled = true;
+                sendBtn.disabled = true;
+                quickSendBtn.disabled = true;
+
+                // Extract more specific error message if available from STOMP frame
+                let errorMessage = 'Unknown error';
+                if (error && error.headers && error.headers.message) {
+                    errorMessage = error.headers.message;
+                } else if (typeof error === 'string') {
+                    errorMessage = error; // Direct error string
+                } else if (error && error.message) { // Fallback for standard Error objects
+                    errorMessage = error.message;
+                }
+
+
+                // Show error message
+                showMessage({
+                    senderId: 'System',
+                    content: `Connection failed: ${errorMessage}. Please check your token and user ID.`
+                }, false);
+            });
+        }
+
+        // Disconnect from WebSocket
+        function disconnect() {
+            if (stompClient !== null) {
+                stompClient.disconnect();
+            }
+
+            connectionStatus.textContent = 'Disconnected';
+            connectionStatus.className = 'status disconnected';
+
+            // Enable/disable buttons
+            connectBtn.disabled = false;
+            disconnectBtn.disabled = true;
+            sendBtn.disabled = true;
+            quickSendBtn.disabled = true;
+
+            // Show disconnect message
+            showMessage({
+                senderId: 'System',
+                content: 'Disconnected from chat service'
+            }, false);
+
+            // Clear user and token on disconnect for security/fresh start
+            token = null;
+            userId = null;
+        }
+
+        // Send a message
+       function sendMessage() {
+            const receiver = receiverId.value.trim();
+            const messageContent = messageInput.value.trim() || quickMessage.value.trim();
+
+
+            if (!receiver) {
+                alert('Please enter the Recipient User ID.');
+                return; // Exits function early
+            }
+            if (!messageContent) {
+                alert('Please type your message.');
+                return; // Exits function early
+            }
+            if (!userId) {
+                alert('Your User ID is not set. Please connect first.');
+                return; // Exits function early
+            }
+
+            if (stompClient && stompClient.connected) {
+
+                const message = {
+                    senderId: userId,
+                    receiverId: receiver,
+                    content: messageContent,
+                };
+
+                try {
+                    stompClient.send("/app/chat.send", {}, JSON.stringify(message));
+
+                } catch (e) {
+                    alert("Error sending message: " + e.message);
+                }
+
+
+                // Display sent message
+                showMessage(message, true);
+                console.log("DEBUG: showMessage() called.");
+
+                // Clear input fields
+                messageInput.value = '';
+                quickMessage.value = '';
+                console.log("DEBUG: Input fields cleared.");
+
+            } else {
+                alert('Not connected to the chat service. Please connect first.');
+                console.error("DEBUG: sendMessage aborted - Not connected to chat service.");
+            }
+            console.log("--- sendMessage function finished ---");
+        }
+
+        // Display a message in the chat
+        function showMessage(message, isSent) {
+            const messageElement = document.createElement('div');
+            messageElement.className = `message ${isSent ? 'sent' : 'received'}`;
+
+            const now = new Date();
+            const timeString = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+            messageElement.innerHTML = `
+                <div class="message-header">
+                    <span class="sender">${isSent ? 'You' : `User ${message.senderId}`}</span>
+                    <span class="time">${timeString}</span>
+                </div>
+                <div class="message-content">${message.content}</div>
+            `;
+
+            chatMessages.appendChild(messageElement);
+
+            // Scroll to bottom
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        // Event listeners
+        connectBtn.addEventListener('click', connect);
+        disconnectBtn.addEventListener('click', disconnect);
+        sendBtn.addEventListener('click', sendMessage);
+        quickSendBtn.addEventListener('click', sendMessage);
+
+        // Enable quick send with Enter key
+        quickMessage.addEventListener('keypress', function(e) {
+            if (e.key === 'Enter' && !quickSendBtn.disabled) { // Added check for disabled quickSendBtn
+                sendMessage();
+            }
+        });
+
+        // Generate a sample token and user ID when page loads
+        window.onload = function() {
+            const sampleToken = 'eyJh' + Math.random().toString(36).substr(2, 9); // Longer, more realistic sample token
+            tokenInput.value = sampleToken;
+            userIdInput.value = Math.floor(Math.random() * 90000) + 10000; // 5-digit random user ID
+            receiverId.value = '45678'; // Sample receiver
+        };
+    </script>
+</body>
+</html>

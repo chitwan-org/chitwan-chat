@@ -1,6 +1,9 @@
 package in.chitwan.chat.repository;
 
+import in.chitwan.chat.model.Message;
 import org.springframework.data.jpa.repository.JpaRepository;
-import in.chitwan.chat.producer.Message;
+import org.springframework.stereotype.Repository;
 
-public interface MessageRepository extends JpaRepository<Message, Long> {}
+@Repository
+public interface MessageRepository extends JpaRepository<Message, Long> {
+}
